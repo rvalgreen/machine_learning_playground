@@ -1,23 +1,4 @@
-# Automatic Classification Viability Analysis (ACVA)
-
-
-## Goals
-- Procurar formas de automatizar tarefas, procurando abandonar “heurísticas manuais”:
-    - Classificação
-    - Previsão
-    - Extração
-    - (…)
-
-
-## How
-
-- Introduzir modelos de AI para automatizar tarefas SIMPLES!
-    É preciso contemplar:
-    - Recursos c/ viabilidade operacional
-    - Performance (*result-oriented*)
-
-- Contemplar introdução de vector-search no RM via Elastic (final)
-
+# Automatic Classification Viability
 
 ## Use Case for Analysis
 
@@ -31,8 +12,24 @@
 - Depois alguém tem que manualmente olhar para elas e tentar associar a Requisição, Contrato ou (Doc) Manual:
     - Gasto de tempo considerável;
     - Vários campos a ter em conta para fazer o "matching";
+    
+## Goals
+- Procurar formas de automatizar tarefas, procurando abandonar “heurísticas manuais”:
+    - Classificação
+    - Previsão
+    - Extração
+    - (…)
 
-Isto vai implicar a criação conjunto de heurísticas - uma decision-tree cujo output é um ou vários **documento prováveis**.
+- Fazendo um levantamento/balanço de Custo x Benefício deste tipo de tecnologias.
+
+## How
+
+- Introduzir modelos de AI para automatizar tarefas SIMPLES!
+    É preciso contemplar:
+    - Recursos c/ viabilidade operacional
+    - Performance (*result-oriented*)
+
+- Contemplar introdução de vector-search no RM via Elastic (final)
 
 
 ### Exemplo de uma Solução "Tradicional":
