@@ -17,7 +17,14 @@ import random
 import joblib
 from utils.data_loader import loadDataset, add_count
 from utils.params_parser import ParamsParser
+import os
 
+"""
+SCRIPT RUN EXAMPLE
+
+python train_simple_classifier.py -d digitalizações_registadas_v2.csv -seed 42 -rn example_classifier -ts -tsCol 'Data Entrada' -tsDate 2024-02-01
+
+"""
 
 if __name__ == '__main__':
     # Parse script args
@@ -38,7 +45,11 @@ if __name__ == '__main__':
 
     # TODO: logic for model saving. directories, etc
     save = False
-    save_dir="models/"+args.runName
+    # /models/model_name
+    model_dir = "models/"+args.runName
+    # /models/model_name/model_name.pkl
+    save_dir=model_dir +"/"+args.runName+".pkl"
+    os.makedirs(model_dir, exist_ok=True)
 
     # Load data
     dataframe = []
@@ -47,9 +58,9 @@ if __name__ == '__main__':
     date_columns = ['Data Emissão','Data entrada','Data vencimento indicada']
     columns_to_drop_with_null=['Data vencimento indicada','Data Emissão','Origem']
     column_label = "Origem"
-    feature_columns = ["Fornecedor","Data Emissão","Data entrada","Data vencimento indicada", "Valor com IVA"]
+    feature_columns = ["Fornecedor", "Valor com IVA", "Âmbito", "Tipo"] #"Data Emissão","Data entrada","Data vencimento indicada"
     number_columns = ['Valor com IVA']
-    string_columns = ["Fornecedor"]
+    string_columns = ["Fornecedor","Âmbito","Tipo"]
 
     # load dataset via pandas dataframe
     dataframe = loadDataset(data_path=args.dataset,
@@ -57,10 +68,6 @@ if __name__ == '__main__':
                        number_columns=number_columns,
                        columns_to_drop_with_null=columns_to_drop_with_null)
     
-
-
-    # TODO: REMOVE THIS. THIS IS ONLY HERE FOR DEMO DATA: Drop specific row with date in year 221
-    dataframe = dataframe[dataframe['Nº documento Fornecedor'] != "ZRF2 2/6001001951"]
 
     # TODO: remove this. this is only here bc i was lazy and havent exported
     # the data from RM correctly (without Requisição)
@@ -81,12 +88,21 @@ if __name__ == '__main__':
 
     # Feature Engineering
     for date_col in date_columns:
+        year_col_name = date_col+"_year"
         month_col_name = date_col+"_month"
         weekday_col_name = date_col+"_weekday"
         day_col_name=date_col+"_day"
+
+        dataframe[year_col_name] = dataframe[date_col].dt.year
         dataframe[month_col_name] = dataframe[date_col].dt.month
         dataframe[weekday_col_name] = dataframe[date_col].dt.dayofweek
         dataframe[day_col_name] = dataframe[date_col].dt.day
+
+        # Add to feature columns
+        feature_columns.append(year_col_name)
+        feature_columns.append(month_col_name)
+        feature_columns.append(weekday_col_name)
+        feature_columns.append(day_col_name)
 
 
     # Init label encoder
@@ -97,6 +113,7 @@ if __name__ == '__main__':
     timesplit_date = '2024-02-01'
     timesplit_column = "Data entrada"    
 
+    # TODO: move the args below to script parameters
     ### Insert here somehow extra data processing / feature engineering steps ###
     # Adding count from requisition file
     dataframe = add_count(
@@ -104,7 +121,8 @@ if __name__ == '__main__':
         supplier_col_main="Fornecedor", 
         file_path='documentos_req.csv', 
         supplier_col_file='Nome Fornecedor', 
-        new_col_name='N Requisiçoes Fornecedor'
+        new_col_name='N Requisiçoes Fornecedor',
+        feature_columns=feature_columns
     )
 
     # Adding count from contract file
@@ -113,8 +131,11 @@ if __name__ == '__main__':
         supplier_col_main="Fornecedor", 
         file_path='contratos.csv', 
         supplier_col_file='Nome Fornecedor', 
-        new_col_name='N Contratos Fornecedor'
+        new_col_name='N Contratos Fornecedor',
+        feature_columns=feature_columns
     )
+
+    print(feature_columns)
     ######
 
     if timesplit:
@@ -146,7 +167,7 @@ if __name__ == '__main__':
     else:
         # Encode string columns
         for col in string_columns:
-            dataframe[col] = label_encoder.fit_transform(a[col])
+            dataframe[col] = label_encoder.fit_transform(dataframe[col])
 
         y = label_encoder.fit_transform(dataframe['Labels'])
         X_train, X_test, y_train, y_test = train_test_split(dataframe, y, test_size=0.2, random_state=args.seed)
@@ -180,7 +201,8 @@ if __name__ == '__main__':
     print("Classification Report:")
     print(report)
 
-
+    model_plot_dir = model_dir +"/plots"
+    os.makedirs(model_plot_dir, exist_ok=True)
     # Draw plots and save them
     plt.figure(figsize=(10, 6))
     plt.scatter(y_test, predictions, alpha=0.1)
@@ -189,13 +211,13 @@ if __name__ == '__main__':
     plt.title('Actual vs Predicted Values of dataFrame')
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig('./plots/actual_vs_predicted_plot.png', format='png') 
+    plt.savefig(model_plot_dir+'/actual_vs_predicted_plot.png', format='png') 
 
 
     # Compute the confusion matrix
     cm = confusion_matrix(y_test, predictions)
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.classes_)
-    plt.savefig('./plots/confusion_matrix.png', format='png')
+    plt.savefig(model_plot_dir+'/confusion_matrix.png', format='png')
 
 
     # Feature Importance
@@ -208,8 +230,7 @@ if __name__ == '__main__':
 
 
     # Save the model to a file
-    save_name = args.wandb+"_model.pkl"
-    joblib.dump(model, save_name)
+    joblib.dump(model, save_dir)
 
     # Load the model from the file
-    # loaded_rfc = joblib.load(save_name)
+    # loaded_rfc = joblib.load(save_dir)

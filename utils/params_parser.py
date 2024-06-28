@@ -21,6 +21,11 @@ class ParamsParser():
         self.parser.add_argument('-d', dest='dataset', default="digitalizações_registadas.csv", help='Dataset/file to use')
         self.parser.add_argument('-eqs', dest='equalSample', default=False, action=argparse.BooleanOptionalAction,
                                  help='Do equal sampling')
+        self.parser.add_argument('-ts', dest='timesplit', default=False, action=argparse.BooleanOptionalAction,
+                                 help='Perform timesplit')
+        self.parser.add_argument('-tsCol', dest='timesplit_col', default="Data Entrada", help='Data col to perform timesplit on')
+        self.parser.add_argument('-tsDate', dest='timesplit_date', default="2024-02-01", help='Data to use for timesplitting')
+
 
         # Model
         self.parser.add_argument('-t', dest='tokenizer', default="distilbert-base-uncased", help='Tokenizer to use')
@@ -33,7 +38,7 @@ class ParamsParser():
         # Other
         self.parser.add_argument('-seed', dest='seed', type=int, default=42,
                                  help='Training seed', required=False)
-        self.parser.add_argument('-rn', dest='runName', type=int, default="my_run",
+        self.parser.add_argument('-rn', dest='runName', default="my_run",
                                  help='Wandb run name', required=False)
         
         # Wandb
