@@ -19,6 +19,8 @@ class ParamsParser():
 
         # Data
         self.parser.add_argument('-d', dest='dataset', default="digitalizações_registadas.csv", help='Dataset/file to use')
+        self.parser.add_argument('-eqs', dest='equalSample', default=False, action=argparse.BooleanOptionalAction,
+                                 help='Do equal sampling')
 
         # Model
         self.parser.add_argument('-t', dest='tokenizer', default="distilbert-base-uncased", help='Tokenizer to use')

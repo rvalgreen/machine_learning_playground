@@ -2,20 +2,20 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
-from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_absolute_error, accuracy_score
 import matplotlib.pyplot as plt
 import torch
 from transformers import DataCollatorWithPadding, GPT2Tokenizer, DistilBertForSequenceClassification, DistilBertModel, DistilBertTokenizer, TrainingArguments, Trainer, TrainingArguments
 from datasets import load_metric
 from torch.utils.data import DataLoader, Dataset
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import confusion_matrix, classification_report, roc_curve, auc,  mean_absolute_error, mean_squared_error, r2_score
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report, roc_curve, auc,  mean_absolute_error, mean_squared_error, r2_score
 from torch import nn
 import matplotlib.pyplot as plt
 import seaborn as sns
 import random
-
-from utils.data_loader import loadDataset
+import joblib
+from utils.data_loader import loadDataset, add_count
 from utils.params_parser import ParamsParser
 
 
@@ -59,6 +59,9 @@ if __name__ == '__main__':
     
 
 
+    # TODO: REMOVE THIS. THIS IS ONLY HERE FOR DEMO DATA: Drop specific row with date in year 221
+    dataframe = dataframe[dataframe['Nº documento Fornecedor'] != "ZRF2 2/6001001951"]
+
     # TODO: remove this. this is only here bc i was lazy and havent exported
     # the data from RM correctly (without Requisição)
     dataframe = dataframe[dataframe['Origem'] != "Requisição"]
@@ -67,12 +70,23 @@ if __name__ == '__main__':
     dataframe['Labels'] = dataframe[column_label]
 
 
+    # Equal sample size 
+    def select_by_date(group):
+        return group.sort_values(by='Data entrada').head(min_size)
+
+    if args.equalSample:
+        grouped = dataframe.groupby('Labels')
+        min_size = grouped.size().min()
+        dataFrame = grouped.apply(lambda x: x.sample(min_size)).reset_index(drop=True)
+
     # Feature Engineering
     for date_col in date_columns:
         month_col_name = date_col+"_month"
         weekday_col_name = date_col+"_weekday"
+        day_col_name=date_col+"_day"
         dataframe[month_col_name] = dataframe[date_col].dt.month
         dataframe[weekday_col_name] = dataframe[date_col].dt.dayofweek
+        dataframe[day_col_name] = dataframe[date_col].dt.day
 
 
     # Init label encoder
@@ -82,6 +96,26 @@ if __name__ == '__main__':
     timesplit = True
     timesplit_date = '2024-02-01'
     timesplit_column = "Data entrada"    
+
+    ### Insert here somehow extra data processing / feature engineering steps ###
+    # Adding count from requisition file
+    dataframe = add_count(
+        main_df=dataframe, 
+        supplier_col_main="Fornecedor", 
+        file_path='documentos_req.csv', 
+        supplier_col_file='Nome Fornecedor', 
+        new_col_name='N Requisiçoes Fornecedor'
+    )
+
+    # Adding count from contract file
+    dataframe = add_count(
+        main_df=dataframe, 
+        supplier_col_main="Fornecedor", 
+        file_path='contratos.csv', 
+        supplier_col_file='Nome Fornecedor', 
+        new_col_name='N Contratos Fornecedor'
+    )
+    ######
 
     if timesplit:
         # Split data according to specified date
@@ -107,6 +141,8 @@ if __name__ == '__main__':
             dataframe_before[col] = label_encoder.fit_transform(dataframe_before[col])
             dataframe_after[col] = label_encoder.fit_transform(dataframe_after[col])
 
+        X_train = dataframe_before
+        X_test = dataframe_after
     else:
         # Encode string columns
         for col in string_columns:
@@ -138,5 +174,42 @@ if __name__ == '__main__':
 
 
     # Calculate accuracy
-    accuracy = sum(1 for true, pred in zip(y_test, predictions) if true == pred) / len(y_test)
-    print(f'Accuracy: {accuracy * 100:.2f}%')
+    accuracy = accuracy_score(y_test, predictions)
+    report = classification_report(y_test, predictions)
+    print(f"Accuracy: {accuracy}")
+    print("Classification Report:")
+    print(report)
+
+
+    # Draw plots and save them
+    plt.figure(figsize=(10, 6))
+    plt.scatter(y_test, predictions, alpha=0.1)
+    plt.xlabel('Actual Value of dataFrame')
+    plt.ylabel('Predicted Value of dataFrame')
+    plt.title('Actual vs Predicted Values of dataFrame')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig('./plots/actual_vs_predicted_plot.png', format='png') 
+
+
+    # Compute the confusion matrix
+    cm = confusion_matrix(y_test, predictions)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.classes_)
+    plt.savefig('./plots/confusion_matrix.png', format='png')
+
+
+    # Feature Importance
+    feature_importance = model.feature_importances_
+    feature_names = X_train.columns
+    feature_importance_df = pd.DataFrame({'Feature': feature_names, 'Importance': feature_importance})
+    feature_importance_df = feature_importance_df.sort_values(by='Importance', ascending=False)
+    print('Feature Importance:')
+    print(feature_importance_df)
+
+
+    # Save the model to a file
+    save_name = args.wandb+"_model.pkl"
+    joblib.dump(model, save_name)
+
+    # Load the model from the file
+    # loaded_rfc = joblib.load(save_name)
